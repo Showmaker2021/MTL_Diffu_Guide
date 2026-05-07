@@ -1,0 +1,128 @@
+============================================================
+  Checkpoint: params.pkl  [.pkl]
+  Algo type : METRA
+============================================================
+
+[option_policy]
+PolicyEx(
+  (_module): GaussianMLPTwoHeadedModuleEx(
+    (_shared_mean_log_std_network): MultiHeadedMLPModule(
+      (_layers): ModuleList(
+        (0): Sequential(
+          (linear): Linear(in_features=34, out_features=1024, bias=True)
+          (non_linearity): <built-in method tanh of type object at 0x7f54a8c63480>
+        )
+        (1): Sequential(
+          (linear): Linear(in_features=1024, out_features=1024, bias=True)
+          (non_linearity): <built-in method tanh of type object at 0x7f54a8c63480>
+        )
+      )
+      (_output_layers): ModuleList(
+        (0-1): 2 x Sequential(
+          (linear): Linear(in_features=1024, out_features=6, bias=True)
+        )
+      )
+    )
+  )
+)
+  params: 1,097,741  (1.098 M)
+
+[traj_encoder]
+GaussianMLPIndependentStdModuleEx(
+  (_mean_module): MLPModule(
+    (_layers): ModuleList(
+      (0): Sequential(
+        (linear): Linear(in_features=18, out_features=1024, bias=True)
+        (non_linearity): <built-in method relu of type object at 0x7f54a8c63480>
+      )
+      (1): Sequential(
+        (linear): Linear(in_features=1024, out_features=1024, bias=True)
+        (non_linearity): <built-in method relu of type object at 0x7f54a8c63480>
+      )
+    )
+    (_output_layers): ModuleList(
+      (0): Sequential(
+        (linear): Linear(in_features=1024, out_features=16, bias=True)
+      )
+    )
+  )
+  (_log_std_module): MLPModule(
+    (_layers): ModuleList(
+      (0): Sequential(
+        (linear): Linear(in_features=18, out_features=1024, bias=True)
+        (non_linearity): <built-in method relu of type object at 0x7f54a8c63480>
+      )
+      (1): Sequential(
+        (linear): Linear(in_features=1024, out_features=1024, bias=True)
+        (non_linearity): <built-in method relu of type object at 0x7f54a8c63480>
+      )
+    )
+    (_output_layers): ModuleList(
+      (0): Sequential(
+        (linear): Linear(in_features=1024, out_features=16, bias=True)
+      )
+    )
+  )
+)
+  params: 2,170,913  (2.171 M)
+
+[qf1]
+ContinuousMLPQFunctionEx(
+  (_layers): ModuleList(
+    (0): Sequential(
+      (linear): Linear(in_features=40, out_features=1024, bias=True)
+      (non_linearity): <built-in method relu of type object at 0x7f54a8c63480>
+    )
+    (1): Sequential(
+      (linear): Linear(in_features=1024, out_features=1024, bias=True)
+      (non_linearity): <built-in method relu of type object at 0x7f54a8c63480>
+    )
+  )
+  (_output_layers): ModuleList(
+    (0): Sequential(
+      (linear): Linear(in_features=1024, out_features=1, bias=True)
+    )
+  )
+)
+  params: 1,092,609  (1.093 M)
+
+[qf2]
+ContinuousMLPQFunctionEx(
+  (_layers): ModuleList(
+    (0): Sequential(
+      (linear): Linear(in_features=40, out_features=1024, bias=True)
+      (non_linearity): <built-in method relu of type object at 0x7f54a8c63480>
+    )
+    (1): Sequential(
+      (linear): Linear(in_features=1024, out_features=1024, bias=True)
+      (non_linearity): <built-in method relu of type object at 0x7f54a8c63480>
+    )
+  )
+  (_output_layers): ModuleList(
+    (0): Sequential(
+      (linear): Linear(in_features=1024, out_features=1, bias=True)
+    )
+  )
+)
+  params: 1,092,609  (1.093 M)
+
+[dual_lam]
+ParameterModule()
+  params: 1  (0.000 M)
+
+[log_alpha]
+ParameterModule()
+  params: 1  (0.000 M)
+
+--------------------------------------------
+  Component                  Params
+--------------------------------------------
+  option_policy           1,097,741  (1.098 M)
+  traj_encoder            2,170,913  (2.171 M)
+  qf1                     1,092,609  (1.093 M)
+  qf2                     1,092,609  (1.093 M)
+  dual_lam                        1  (0.000 M)
+  log_alpha                       1  (0.000 M)
+--------------------------------------------
+  TOTAL                   5,453,874  (5.454 M)  (0.0055 B)
+============================================================

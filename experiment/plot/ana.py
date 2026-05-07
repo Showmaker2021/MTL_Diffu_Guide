@@ -134,41 +134,133 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-labels = [
+# -----------------------------
+# Colors
+# -----------------------------
+COLOR_A = "#6F8F72"   # muted green
+COLOR_B = "#E6D8B5"   # soft beige
+
+# -----------------------------
+# Decoder data (split into 2)
+# -----------------------------
+labels_decoder = [
     "SOLID",
-    "Embed Gate",
-    "Score (γ=1.0)",
-    "Score (γ=0.5)",
-    "w/o Residual",
-    "w/o Bias"
+    "Embedding",
+    "No Cap",
+    "No Residual",
+    "No Struct."
 ]
 
-seen = [9.446, 9.613, 10.022, 9.802, 9.516, 9.911]
-unseen  = [10.166, 11.213, 11.835, 10.322, 10.581, 11.715]
+seen = [4.42, 4.64, 4.55, 4.69, 4.66]
+unseen = [4.74, 4.91, 4.95, 4.83, 4.97]
 
-x_pos = np.arange(len(labels))
+# Split
+labels_mech = labels_decoder[:3]
+seen_mech = seen[:3]
+unseen_mech = unseen[:3]
+
+labels_struct = [labels_decoder[0]] + labels_decoder[3:]
+seen_struct = [seen[0]] + seen[3:]
+unseen_struct = [unseen[0]] + unseen[3:]
+
+# -----------------------------
+# Diffusion
+# -----------------------------
+models = ["SOLID", "w/o Diff"]
+with_diff = [4.42, 4.74]
+without_diff = [4.62, 5.03]
+
+# -----------------------------
+# Slots
+# -----------------------------
+# slots = ["Slot-4", "Slot-8", "Slot-16", "Slot-32"]
+# size50_slots = [4.60, 4.57, 4.44, 4.42]
+# size100_slots = [4.78, 4.94, 4.80, 4.74]
+
+
+slots = ["Slot-8", "Slot-16", "Slot-32", "Slot-64"]
+size100_slots = [4.94, 4.86, 4.74, 5.02]
+size50_slots = [4.60, 4.57, 4.44, np.nan]
+
+# -----------------------------
+# Plot setup (4 panels)
+# -----------------------------
+fig, axes = plt.subplots(1, 4, figsize=(14, 3.5))
 width = 0.35
 
-plt.figure(figsize=(8,5))
+# -----------------------------
+# (a) Decoder - mechanism
+# -----------------------------
+ax = axes[0]
+x = np.arange(len(labels_mech))
 
-# Vertical bars
-plt.bar(x_pos - width/2, seen, width, color="#5D866C", label="Seen")
-plt.bar(x_pos + width/2, unseen, width, color="#D5E8D4", label="Unseen")
+ax.bar(x - width/2, seen_mech, width, color=COLOR_B)
+ax.bar(x + width/2, unseen_mech, width, color=COLOR_A)
+ax.set_ylim(4, 5)
 
-# Axis + labels
-plt.xticks(x_pos, labels, rotation=20, ha="right")  # rotate for readability
-plt.ylabel("Optimality Gap (%)")
-plt.ylim(5, max(unseen) + 1)
+ax.set_xticks(x)
+ax.set_xticklabels(labels_mech, rotation=15)
+ax.set_title("(a) Gating Mechanism")
 
-# Legend
-plt.legend(
-    fontsize=12,
-    title_fontsize=13,
-    loc="best",
-    frameon=True
-)
+ax.legend(["Size 50", "Size 100"], fontsize=10, frameon=False, loc="upper left")
+
+# -----------------------------
+# (b) Decoder - structural
+# -----------------------------
+ax = axes[1]
+x = np.arange(len(labels_struct))
+
+ax.bar(x - width/2, seen_struct, width, color=COLOR_B)
+ax.bar(x + width/2, unseen_struct, width, color=COLOR_A)
+ax.set_ylim(4, 5)
+
+ax.set_xticks(x)
+ax.set_xticklabels(labels_struct, rotation=15)
+ax.set_title("(b) Structural Components")
+
+ax.legend(["Size 50", "Size 100"], fontsize=10, frameon=False, loc="upper left")
+
+# -----------------------------
+# (c) Diffusion
+# -----------------------------
+ax = axes[2]
+x = np.arange(len(models))
+
+ax.bar(x - width/2, with_diff, width, color=COLOR_B)
+ax.bar(x + width/2, without_diff, width, color=COLOR_A)
+
+ax.set_xticks(x)
+ax.set_xticklabels(models)
+ax.set_title("(c) Diffusion Objective")
+ax.set_ylim(4, 5.5)
+
+ax.legend(["Size 50", "Size 100"], fontsize=10, frameon=False, loc="upper left")
+
+# -----------------------------
+# (d) Slots
+# -----------------------------
+ax = axes[3]
+x = np.arange(len(slots))
+
+ax.bar(x - width/2, size50_slots, width, color=COLOR_B)
+ax.bar(x + width/2, size100_slots, width, color=COLOR_A)
+
+ax.set_xticks(x)
+ax.set_xticklabels(slots)
+ax.set_title("(d) Slot Sensitivity")
+ax.set_ylim(4, 5.2)
+
+ax.legend(["Size 50", "Size 100"], fontsize=10, frameon=False, loc="upper left")
+
+# -----------------------------
+# Styling
+# -----------------------------
+for ax in axes:
+    ax.set_ylabel("Gap (%)")
+    ax.grid(axis="y", linestyle="--", alpha=0.3)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
 
 plt.tight_layout()
-plt.savefig("decoder_ablation.png", dpi=300, bbox_inches="tight")
+plt.savefig("ablation_4panel.png", dpi=300, bbox_inches="tight")
 plt.show()
-plt.close()
