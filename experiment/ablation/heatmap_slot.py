@@ -12,7 +12,7 @@ delta = np.array([
     [3.8, 4.2, 4.5, 4.3, 4.1],
     [4.5, 4.7, 5.2, 4.9, 4.8],
     [4.1, 4.4, 4.8, 4.6, 4.3],
-])
+]) * 2
 
 # ---- 3. Custom warm colormap (yellow → green) ----
 cmap = LinearSegmentedColormap.from_list(

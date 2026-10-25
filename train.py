@@ -45,6 +45,7 @@ def args2dict(args):
         "max_timesteps": args.max_timesteps,
         "denoiser_heads": args.denoiser_heads,
         "denoiser_layers": args.denoiser_layers,
+        "diffusion_slot_mode": args.diffusion_slot_mode,
         
         # Legacy Reconstruction (optional)
         "enable_slot_reconstruction": args.enable_slot_reconstruction,
@@ -152,6 +153,9 @@ if __name__ == "__main__":
                         help="Number of attention heads in denoiser")
     parser.add_argument('--denoiser_layers', type=int, default=2,
                         help="Number of transformer layers in denoiser")
+    parser.add_argument('--diffusion_slot_mode', type=str, default='normal',
+                        choices=['normal', 'shuffled', 'stopgrad', 'noisy_slots'],
+                        help="How slots are fed to denoiser for ablation: normal, shuffled (batch derangement), stopgrad (S.detach()), noisy_slots (S_tilde = SlotAttention(Embed(Xt)))")
     
     # Legacy Reconstruction (optional, usually disabled)
     parser.add_argument('--enable_slot_reconstruction', action='store_true', default=False,

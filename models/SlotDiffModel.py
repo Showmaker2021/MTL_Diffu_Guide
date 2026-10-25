@@ -312,6 +312,9 @@ class SlotDiffModel(nn.Module):
             self.max_timesteps = model_params.get('max_timesteps', 1000)
         
         # Legacy reconstruction
+        # Ablation: how slots are fed to the denoiser (normal | shuffled | stopgrad)
+        self.diffusion_slot_mode = model_params.get('diffusion_slot_mode', 'normal')
+
         self.enable_reconstruction = model_params.get('enable_slot_reconstruction', False)
         if self.enable_reconstruction:
             self.reconstruction_head = nn.Sequential(
@@ -415,7 +418,28 @@ class SlotDiffModel(nn.Module):
         z_t = torch.sqrt(alpha_t) * z_0 + torch.sqrt(1 - alpha_t) * noise
         
         # Predict noise
-        predicted_noise = self.denoiser(z_t, t, self.slots)
+        # Ablation: condition denoiser on transformed slots only (policy keeps true self.slots)
+        slots_for_denoiser = self.slots
+        if self.diffusion_slot_mode == 'stopgrad':
+            slots_for_denoiser = self.slots.detach()
+        elif self.diffusion_slot_mode == 'shuffled':
+            bsize = self.slots.size(0)
+            perm = torch.randperm(bsize, device=self.device)
+            while (perm == torch.arange(bsize, device=self.device)).any():
+                perm = torch.randperm(bsize, device=self.device)
+            slots_for_denoiser = self.slots[perm]
+        elif self.diffusion_slot_mode == 'noisy_slots':
+            # Second pass of (shared-weight) slot attention on the NOISED features.
+            # Closes the shortcut: conditioning carries the same noise as z_t, so the
+            # denoiser must actually denoise instead of reading clean content from S.
+            # Gradients flow back through the shared encoder/embedding (distinct from stopgrad).
+            sa = self.encoder.slot_attention_module
+            saved_slots, saved_attn = sa.last_slots, sa.last_attention
+            emb_noisy = self.encoder.embedding_node(z_t)   # InitialEmbedding(Xt): [B, N, D]
+            slots_for_denoiser = sa(emb_noisy)             # S_tilde: [B, K, D]
+            sa.last_slots, sa.last_attention = saved_slots, saved_attn
+
+        predicted_noise = self.denoiser(z_t, t, slots_for_denoiser)
         
         # MSE loss
         diffusion_loss = F.mse_loss(predicted_noise, noise)
