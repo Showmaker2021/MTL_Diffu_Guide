@@ -121,6 +121,9 @@ def get_env(problem):
 
 
 def get_model(model_type):
+    if model_type == 'URS':
+        from models.URSModel import URSModel
+        return URSModel
     from models import SINGLEModel, MOEModel, MOEModel_Light, MTLModel, MTLModel_Mixed, MOEModel_Mixed, MOEModel_Light_Mixed, SlotDiffModel, SlotModel, SlotDiffMOEModel
     if model_type == "MTL":
         return MTLModel

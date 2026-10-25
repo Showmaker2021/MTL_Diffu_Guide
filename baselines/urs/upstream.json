@@ -1,0 +1,26 @@
+{
+  "repository": "https://github.com/CIAM-Group/URS",
+  "revision": "69c6766219e40d18fd8b371fedfc208241e5be9e",
+  "source_sha256": {
+    "model/Model.py": "f759d5df8f4f9f8000552f430fdb0f1e48f2ce78a60301bc1f02aadcdddb0da9",
+    "model/Model_LIB.py": "52664f2ffb48f95f99985f4f067c2ebdf5da6e146bd6249e24accf21bc2d8e76",
+    "problem/ProblemSet.py": "625d3fbd099246294519099330801565a68cd54c1be432845735a06ff6ca3d1d",
+    "problem/ProblemRep.py": "6546f0c160dd5049c801d01565a7b57231078354dbd9c271821dfcbf4aba0179",
+    "LICENSE": "0e25690768ef00e45d4edf8762012c7e22f6100525e63a6edf3dc8775b82fccb"
+  },
+  "original_defaults": {
+    "epochs": 500,
+    "encoder_layers": 12,
+    "embedding_dim": 128,
+    "ff_hidden_dim": 512,
+    "logit_clipping": 50,
+    "optimizer": "AdamW",
+    "lr": 0.0001,
+    "lr_decay_epoch": [
+      451
+    ],
+    "batches_per_epoch": 2000,
+    "batch_size": 128,
+    "problem_size": 100
+  }
+}

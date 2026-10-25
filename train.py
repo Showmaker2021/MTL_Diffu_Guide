@@ -1,8 +1,10 @@
 import os, random, math, time
+import json
 import pytz
 import argparse
 import pprint as pp
 from datetime import datetime
+from pathlib import Path
 
 from Trainer import Trainer
 from utils import *
@@ -49,6 +51,7 @@ def args2dict(args):
         
         # Legacy Reconstruction (optional)
         "enable_slot_reconstruction": args.enable_slot_reconstruction,
+        "demand_max1": not args.no_demand_max1,
     }
     
     optimizer_params = {
@@ -66,6 +69,7 @@ def args2dict(args):
         "epochs": args.epochs, 
         "train_episodes": args.train_episodes,
         "train_batch_size": args.train_batch_size, 
+        "log_interval": args.log_interval,
         "validation_interval": args.validation_interval,
         "model_save_interval": args.model_save_interval, 
         "checkpoint": args.checkpoint,
@@ -98,18 +102,21 @@ if __name__ == "__main__":
     # =========================================================================
     # MODEL PARAMS
     # =========================================================================
-    parser.add_argument('--model_type', type=str, default="SlotDiff", choices=["MOE_LIGHT_Mixed", "MOE_Mixed", "MTL_Mixed","SINGLE", "MTL", "MOE", "MOE_LIGHT", "SlotDiffModel", "SlotModel", "SlotDiffMOEModel"])
+    parser.add_argument('--model_type', type=str, default="SlotDiffModel", choices=["MOE_LIGHT_Mixed", "MOE_Mixed", "MTL_Mixed","SINGLE", "MTL", "MOE", "MOE_LIGHT", "SlotDiffModel", "SlotModel", "SlotDiffMOEModel", "MTLKD", "URS"])
     
     # Basic Architecture
     parser.add_argument('--embedding_dim', type=int, default=128)
     parser.add_argument('--sqrt_embedding_dim', type=float, default=128**(1/2))
-    parser.add_argument('--encoder_layer_num', type=int, default=6, 
-                        help="the number of MHA in encoder")
-    parser.add_argument('--decoder_layer_num', type=int, default=1, 
-                        help="the number of MHA in decoder")
+    parser.add_argument('--encoder_layer_num', type=int, default=None,
+                        help="encoder layers (default: MTLKD 1, URS 12, other models 6)")
+    parser.add_argument('--decoder_layer_num', type=int, default=None,
+                        help="decoder layers (default: 6 for MTLKD, 1 for other models)")
     parser.add_argument('--qkv_dim', type=int, default=16)
     parser.add_argument('--head_num', type=int, default=8)
-    parser.add_argument('--logit_clipping', type=float, default=10)
+    parser.add_argument('--logit_clipping', type=float, default=None,
+                        help='logit clipping (default: URS 50, other models 10)')
+    parser.add_argument('--no_demand_max1', action='store_true',
+                        help='disable URS node-demand rescaling by each instance maximum')
     parser.add_argument('--ff_hidden_dim', type=int, default=512)
     
     # MoE Settings
@@ -130,7 +137,7 @@ if __name__ == "__main__":
     # Evaluation & Normalization
     parser.add_argument('--eval_type', type=str, default="argmax", 
                         choices=["argmax", "softmax"])
-    parser.add_argument('--norm', type=str, default="instance", 
+    parser.add_argument('--norm', type=str, default=None,
                         choices=["batch", "batch_no_track", "instance", "layer", "rezero", "none"])
     parser.add_argument('--norm_loc', type=str, default="norm_last", 
                         choices=["norm_first", "norm_last"], 
@@ -165,24 +172,37 @@ if __name__ == "__main__":
     # OPTIMIZER PARAMS
     # =========================================================================
     parser.add_argument('--lr', type=float, default=1e-4)
+    parser.add_argument('--optimizer_type', choices=['Adam', 'AdamW'], default=None,
+                        help='optimizer (default: URS AdamW, other methods Adam)')
     parser.add_argument('--weight_decay', type=float, default=1e-6)
-    parser.add_argument('--milestones', type=int, nargs='+', default=[4501, ], 
-                        help='when to decay lr')
+    parser.add_argument('--milestones', type=int, nargs='+', default=None,
+                        help='LR decay milestones (default: URS 451, other methods 4501)')
     parser.add_argument('--gamma', type=float, default=0.1, 
                         help='new_lr = lr * gamma')
 
     # =========================================================================
     # TRAINER PARAMS
     # =========================================================================
-    parser.add_argument('--epochs', type=int, default=5000, 
-                        help="total training epochs")
+    parser.add_argument('--epochs', type=int, default=None,
+                        help="final training epoch (default: 900 for MTLKD, 500 for URS, 5000 otherwise)")
     parser.add_argument('--train_episodes', type=int, default=10000 * 2, 
                         help="the num. of training instances per epoch")
     parser.add_argument('--train_batch_size', type=int, default=128)
+    parser.add_argument('--log_interval', type=int, default=0,
+                        help='print batch progress every N batches (0: epoch logs only)')
+    parser.add_argument('--strict_aux_losses', action='store_true',
+                        help='stop on auxiliary-loss errors or non-finite total loss')
     parser.add_argument('--validation_interval', type=int, default=5000)
     parser.add_argument('--model_save_interval', type=int, default=100)
     parser.add_argument('--checkpoint', type=str, default=None, 
                         help="resume training")
+    parser.add_argument('--teacher_dir', type=Path,
+                        default=Path(__file__).resolve().parent / 'pretrained' / 'mtlkd')
+    parser.add_argument('--teacher_size', type=int, default=100)
+    parser.add_argument('--no_download_teachers', action='store_true',
+                        help='require cached MTLKD teachers instead of downloading missing ones')
+    parser.add_argument('--pomo_chunk_size', type=int, default=8,
+                        help='MTLKD trajectories per chunk; gradients accumulate across chunks')
     
     # =========================================================================
     # DUAL-TASK: LOSS WEIGHTS (NEW!)
@@ -202,12 +222,53 @@ if __name__ == "__main__":
     parser.add_argument('--no_cuda', action='store_true')
     parser.add_argument('--gpu_id', type=int, default=1)
     parser.add_argument('--occ_gpu', type=float, default=0., 
-                        help="occupy (X)% GPU memory in advance, please use sparingly.")
+                        help="preallocate a fraction of GPU memory; use sparingly")
 
     # =========================================================================
     # PARSE & VALIDATE
     # =========================================================================
     args = parser.parse_args()
+    if args.epochs is None:
+        args.epochs = {'MTLKD': 900, 'URS': 500}.get(args.model_type, 5000)
+    if args.encoder_layer_num is None:
+        args.encoder_layer_num = {'MTLKD': 1, 'URS': 12}.get(args.model_type, 6)
+    if args.logit_clipping is None:
+        args.logit_clipping = 50 if args.model_type == 'URS' else 10
+    if args.optimizer_type is None:
+        args.optimizer_type = 'AdamW' if args.model_type == 'URS' else 'Adam'
+    if args.milestones is None:
+        args.milestones = [451] if args.model_type == 'URS' else [4501]
+    if args.norm is None:
+        args.norm = 'none' if args.model_type == 'MTLKD' else 'instance'
+    if args.decoder_layer_num is None:
+        args.decoder_layer_num = 6 if args.model_type == 'MTLKD' else 1
+    if args.model_type == 'URS':
+        if args.enable_slot_diffusion or args.enable_slot_reconstruction:
+            parser.error('Slot auxiliary objectives do not apply to URS')
+        if args.norm != 'instance' or args.norm_loc != 'norm_last' or args.decoder_layer_num != 1:
+            parser.error('URS uses instance normalization after residuals and a single adaptive decoder')
+        args.lambda_diffusion = args.lambda_recon = args.lambda_contrastive = 0.0
+        if Path(args.log_dir) == Path('results'):
+            args.log_dir = str(Path(args.log_dir) / 'URS')
+    if args.model_type == 'MTLKD':
+        from baselines.mtlkd.training import main as train_mtlkd
+        from baselines.mtlkd.protocol import TRAIN_PROBLEMS
+        if args.problem != 'Train_ALL' and args.problem not in TRAIN_PROBLEMS:
+            parser.error('MTLKD training requires Train_ALL or one of its six teacher tasks')
+        if args.enable_slot_diffusion or args.enable_slot_reconstruction:
+            parser.error('Slot auxiliary objectives do not apply to MTLKD')
+        if args.encoder_layer_num != 1 or args.norm != 'none':
+            parser.error('The upstream MTLKD architecture uses one encoder layer and --norm none')
+        if args.optimizer_type != 'Adam':
+            parser.error('The integrated MTLKD protocol uses Adam')
+        if args.epochs < 1 or args.train_episodes < 1 or args.train_batch_size < 1 or args.pomo_chunk_size < 1:
+            parser.error('epochs, episodes, batch size, and chunk size must be positive')
+        args.log_dir = Path(args.log_dir)
+        if args.log_dir == Path('results'):
+            args.log_dir = args.log_dir / 'MTLKD'
+        args.log_interval = args.log_interval or 10
+        train_mtlkd(args=args)
+        raise SystemExit(0)
     
     # Print configuration
     print("=" * 80)
@@ -261,6 +322,8 @@ if __name__ == "__main__":
         torch.set_default_tensor_type('torch.FloatTensor')
     
     print(">> USE_CUDA: {}, CUDA_DEVICE_NUM: {}".format(not args.no_cuda, args.gpu_id))
+    env_params['device'] = args.device
+    model_params['device'] = args.device
 
     # =========================================================================
     # START TRAINING
@@ -269,6 +332,10 @@ if __name__ == "__main__":
     print(">> Start {} Training using {} Model ...".format(args.problem, args.model_type))
     print("=" * 80 + "\n")
     
+    with open(os.path.join(args.log_path, 'config.json'), 'w') as config_file:
+        json.dump(vars(args), config_file, indent=2, default=str)
+        config_file.write('\n')
+
     trainer = Trainer(
         args=args, 
         env_params=env_params, 

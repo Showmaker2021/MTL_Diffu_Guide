@@ -7,6 +7,7 @@ from torch.optim.lr_scheduler import MultiStepLR as Scheduler
 import csv
 
 from utils import *
+from checkpointing import capture_rng_state, restore_training_state
 
 
 class Trainer:
@@ -17,6 +18,7 @@ class Trainer:
         self.model_params = model_params
         self.optimizer_params = optimizer_params
         self.trainer_params = trainer_params
+        self.strict_aux_losses = getattr(args, 'strict_aux_losses', False)
 
         # ========================================
         # LOSS WEIGHTS CONFIGURATION
@@ -42,7 +44,8 @@ class Trainer:
         # Main Components
         self.envs = get_env(self.args.problem)
         self.model = get_model(self.args.model_type)(**self.model_params).to(self.device)
-        self.optimizer = Optimizer(self.model.parameters(), **self.optimizer_params['optimizer'])
+        optimizer_class = torch.optim.AdamW if getattr(args, 'optimizer_type', 'Adam') == 'AdamW' else Optimizer
+        self.optimizer = optimizer_class(self.model.parameters(), **self.optimizer_params['optimizer'])
         self.scheduler = Scheduler(self.optimizer, **self.optimizer_params['scheduler'])
         num_param(self.model)
 
@@ -53,8 +56,7 @@ class Trainer:
             checkpoint = torch.load(checkpoint_fullname, map_location=self.device, weights_only=False)
             self.model.load_state_dict(checkpoint['model_state_dict'], strict=True)
             self.start_epoch = 1 + checkpoint['epoch']
-            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-            self.scheduler.last_epoch = checkpoint['epoch'] - 1
+            restore_training_state(checkpoint, self.optimizer, self.scheduler)
             print(">> Checkpoint (Epoch: {}) Loaded!".format(checkpoint['epoch']))
 
         # utility
@@ -86,9 +88,11 @@ class Trainer:
                 checkpoint_dict = {
                     'epoch': epoch,
                     'problem': self.args.problem,
+                    'config': vars(self.args).copy(),
                     'model_state_dict': self.model.state_dict(),
                     'optimizer_state_dict': self.optimizer.state_dict(),
                     'scheduler_state_dict': self.scheduler.state_dict(),
+                    'rng_state': capture_rng_state(),
                     'result_log': self.result_log
                 }
                 torch.save(checkpoint_dict, '{}/epoch-{}.pt'.format(self.log_path, epoch))
@@ -97,6 +101,7 @@ class Trainer:
         episode = 0
         score_AM, loss_AM = AverageMeter(), AverageMeter()
         train_num_episode = self.trainer_params['train_episodes']
+        batch_index = 0
 
         while episode < train_num_episode:
             remaining = train_num_episode - episode
@@ -110,6 +115,12 @@ class Trainer:
             score_AM.update(avg_score, batch_size)
             loss_AM.update(avg_loss, batch_size)
             episode += batch_size
+            batch_index += 1
+            log_interval = self.trainer_params.get('log_interval', 0)
+            if log_interval > 0 and (batch_index == 1 or batch_index % log_interval == 0):
+                print(f'Epoch {epoch}: {episode}/{train_num_episode} instances, '
+                      f'task={env.problem}, score={avg_score:.4f}, '
+                      f'losses={self.last_loss_components}', flush=True)
 
         # Log Once, for each epoch
         print('Epoch {:3d}: Train ({:3.0f}%)  Score: {:.4f},  Loss: {:.4f}'.format(
@@ -169,6 +180,8 @@ class Trainer:
                 total_loss = total_loss + self.lambda_diffusion * diffusion_loss
                 loss_dict['diffusion'] = diffusion_loss.item()
             except Exception as e:
+                if self.strict_aux_losses:
+                    raise
                 print(f" [Warning: Diffusion loss failed: {e}]", end="")
                 loss_dict['diffusion'] = 0.0
 
@@ -181,6 +194,8 @@ class Trainer:
                 total_loss = total_loss + self.lambda_recon * recon_loss
                 loss_dict['recon'] = recon_loss.item()
             except Exception as e:
+                if self.strict_aux_losses:
+                    raise
                 print(f" [Warning: Recon loss failed: {e}]", end="")
                 loss_dict['recon'] = 0.0
 
@@ -193,6 +208,8 @@ class Trainer:
                 total_loss = total_loss + self.lambda_contrastive * contrastive_loss
                 loss_dict['contrastive'] = contrastive_loss.item()
             except Exception as e:
+                if self.strict_aux_losses:
+                    raise
                 print(f" [Warning: Contrastive loss failed: {e}]", end="")
                 loss_dict['contrastive'] = 0.0
 
@@ -206,6 +223,8 @@ class Trainer:
         # ========================================
         # BACKWARD & OPTIMIZE
         # ========================================
+        if self.strict_aux_losses and not torch.isfinite(total_loss):
+            raise FloatingPointError(f'Non-finite total loss: {loss_dict}')
         self.model.zero_grad()
         total_loss.backward()
         self.optimizer.step()
@@ -216,6 +235,7 @@ class Trainer:
         #loss_str = " | ".join([f"{k}: {v:.4f}" for k, v in loss_dict.items() if v > 0])
         #print(f" [{loss_str}]", end="")
 
+        self.last_loss_components = loss_dict
         return score_mean.item(), total_loss.item()
 
     def _val_one_batch(self, data, env, aug_factor=1, eval_type="argmax"):

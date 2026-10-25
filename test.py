@@ -3,6 +3,7 @@ import pytz
 import argparse
 import pprint as pp
 from datetime import datetime
+from pathlib import Path
 
 from Tester import Tester
 from utils import *
@@ -54,6 +55,7 @@ def args2dict(args):
 
         # Inference-only ablation: force decoder gate weight beta = 0
         "gate_off": args.gate_off,
+        "demand_max1": not args.no_demand_max1,
     }
     
     tester_params = {
@@ -93,18 +95,19 @@ if __name__ == "__main__":
     # =========================================================================
     # MODEL PARAMS (MUST MATCH TRAINING CONFIG!)
     # =========================================================================
-    parser.add_argument('--model_type', type=str, default="SlotDiff", choices=["MOE_LIGHT_Mixed", "MOE_Mixed", "MTL_Mixed","SINGLE", "MTL", "MOE", "MOE_LIGHT", "SlotDiffModel", "SlotModel", "SlotDiffMOEModel"])
+    parser.add_argument('--model_type', type=str, default="SlotDiffModel", choices=["MOE_LIGHT_Mixed", "MOE_Mixed", "MTL_Mixed","SINGLE", "MTL", "MOE", "MOE_LIGHT", "SlotDiffModel", "SlotModel", "SlotDiffMOEModel", "MTLKD", "URS"])
     
     # Basic Architecture
     parser.add_argument('--embedding_dim', type=int, default=128)
     parser.add_argument('--sqrt_embedding_dim', type=float, default=128**(1/2))
-    parser.add_argument('--encoder_layer_num', type=int, default=6, 
-                        help="the number of MHA in encoder")
+    parser.add_argument('--encoder_layer_num', type=int, default=None,
+                        help="encoder layers (default: URS 12, other models 6)")
     parser.add_argument('--decoder_layer_num', type=int, default=1, 
                         help="the number of MHA in decoder")
     parser.add_argument('--qkv_dim', type=int, default=16)
     parser.add_argument('--head_num', type=int, default=8)
-    parser.add_argument('--logit_clipping', type=float, default=10)
+    parser.add_argument('--logit_clipping', type=float, default=None)
+    parser.add_argument('--no_demand_max1', action='store_true')
     parser.add_argument('--ff_hidden_dim', type=int, default=512)
     
     # MoE Settings
@@ -171,6 +174,9 @@ if __name__ == "__main__":
                         help="evaluate on default test dataset if None")
     parser.add_argument('--test_set_opt_sol_path', type=str, default=None,
                         help="evaluate on default test dataset if None")
+    parser.add_argument('--data_dir', type=Path, default=Path(__file__).resolve().parent / 'data',
+                        help='shared dataset directory for synthetic evaluation')
+    parser.add_argument('--pomo_chunk_size', type=int, default=8)
     parser.add_argument('--gate_off', action='store_true', default=False,
                         help="Inference only: force slot gate weight beta=0 (node-attention only)")
 
@@ -192,12 +198,36 @@ if __name__ == "__main__":
     parser.add_argument('--no_cuda', action='store_true')
     parser.add_argument('--gpu_id', type=int, default=1)
     parser.add_argument('--occ_gpu', type=float, default=0., 
-                        help="occumpy (X)% GPU memory in advance, please use sparingly.")
+                        help="preallocate a fraction of GPU memory; use sparingly")
 
     # =========================================================================
     # PARSE & SETUP
     # =========================================================================
     args = parser.parse_args()
+    if args.encoder_layer_num is None:
+        args.encoder_layer_num = 12 if args.model_type == 'URS' else 6
+    if args.logit_clipping is None:
+        args.logit_clipping = 50 if args.model_type == 'URS' else 10
+    if args.model_type == 'URS':
+        if args.enable_slot_diffusion or args.enable_slot_reconstruction or args.gate_off:
+            parser.error('Slot objectives and slot gating do not apply to URS')
+        if Path(args.log_dir) == Path('results/test'):
+            args.log_dir = str(Path(args.log_dir) / 'URS')
+    if args.model_type == 'MTLKD':
+        from baselines.mtlkd.evaluation import main as evaluate_mtlkd
+        if args.enable_slot_diffusion or args.gate_off or args.fine_tune_epochs:
+            parser.error('Slot objectives, slot gating, and RL fine-tuning do not apply to MTLKD evaluation')
+        if args.eval_type != 'argmax':
+            parser.error('The integrated MTLKD reporting protocol uses argmax evaluation')
+        if args.pomo_chunk_size < 1 or args.test_episodes < 1 or args.test_batch_size < 1:
+            parser.error('chunk size, episodes, and batch size must be positive')
+        args.log_dir = Path(args.log_dir)
+        if args.log_dir == Path('results/test'):
+            args.log_dir = args.log_dir / 'MTLKD'
+        if args.aug_factor != 1:
+            args.test_batch_size = args.aug_batch_size
+        evaluate_mtlkd(args=args)
+        raise SystemExit(0)
     
     print("=" * 80)
     print("TEST CONFIGURATION:")
@@ -230,6 +260,8 @@ if __name__ == "__main__":
         args.device = torch.device('cpu')
         torch.set_default_tensor_type('torch.FloatTensor')
     print(">> USE_CUDA: {}, CUDA_DEVICE_NUM: {}".format(not args.no_cuda, args.gpu_id))
+    model_params['device'] = args.device
+    env_params['device'] = args.device
 
     # =========================================================================
     # VALIDATE CHECKPOINT
