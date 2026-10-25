@@ -49,6 +49,21 @@ def args2dict(args):
         
         # Legacy Reconstruction (optional)
         "enable_slot_reconstruction": args.enable_slot_reconstruction,
+        # ========================================
+        # SHIELD Baseline Params (ICML 2025)
+        # ========================================
+        "decoder_layers": args.decoder_layers,
+        "use_mod": args.use_mod,
+        "mod_beta": args.mod_beta,
+        "use_cluster": args.use_cluster,
+        "n_clusters": args.n_clusters,
+        "cluster_iters": args.cluster_iters,
+        "use_task_prompt": args.use_task_prompt,
+        "task_dim": args.task_dim,
+        "softmax_dim": args.softmax_dim,
+        "cluster_use_layernorm_state": args.cluster_use_layernorm_state,
+        "cluster_include_depot": args.cluster_include_depot,
+        "router_activation": args.router_activation,
     }
     
     optimizer_params = {
@@ -98,7 +113,7 @@ if __name__ == "__main__":
     # =========================================================================
     # MODEL PARAMS
     # =========================================================================
-    parser.add_argument('--model_type', type=str, default="SlotDiff", choices=["MOE_LIGHT_Mixed", "MOE_Mixed", "MTL_Mixed","SINGLE", "MTL", "MOE", "MOE_LIGHT", "SlotDiffModel", "SlotModel", "SlotDiffMOEModel"])
+    parser.add_argument('--model_type', type=str, default="SlotDiff", choices=["MOE_LIGHT_Mixed", "MOE_Mixed", "MTL_Mixed","SINGLE", "MTL", "MOE", "MOE_LIGHT", "SlotDiffModel", "SlotModel", "SlotDiffMOEModel", "SHIELD"])
     
     # Basic Architecture
     parser.add_argument('--embedding_dim', type=int, default=128)
@@ -161,6 +176,33 @@ if __name__ == "__main__":
     parser.add_argument('--enable_slot_reconstruction', action='store_true', default=False,
                         help="Enable legacy slot reconstruction loss")
 
+    # =========================================================================
+    # SHIELD BASELINE PARAMS (ICML 2025)
+    # =========================================================================
+    parser.add_argument('--decoder_layers', type=int, default=3,
+                        help="number of decoder layers for SHIELD / deeper baseline")
+    parser.add_argument('--use_mod', action=argparse.BooleanOptionalAction, default=True,
+                        help="whether to use Mixture-of-Depths in SHIELD decoder")
+    parser.add_argument('--mod_beta', type=float, default=0.10,
+                        help="MoD routing capacity beta (top-beta agents per step)")
+    parser.add_argument('--use_cluster', action=argparse.BooleanOptionalAction, default=True,
+                        help="whether to use context-based clustering in SHIELD")
+    parser.add_argument('--n_clusters', type=int, default=5,
+                        help="number of clusters Nc in SHIELD")
+    parser.add_argument('--cluster_iters', type=int, default=5,
+                        help="number of iterations B in SHIELD clustering")
+    parser.add_argument('--use_task_prompt', action=argparse.BooleanOptionalAction, default=True,
+                        help="whether to prompt clusters with task gamma")
+    parser.add_argument('--task_dim', type=int, default=5,
+                        help="dimension of task/constraint vector gamma")
+    parser.add_argument('--softmax_dim', type=str, default="cluster", choices=["cluster", "node"],
+                        help="softmax axis for clustering psi")
+    parser.add_argument('--cluster_use_layernorm_state', action=argparse.BooleanOptionalAction, default=False,
+                        help="whether cluster state uses LayerNorm")
+    parser.add_argument('--cluster_include_depot', action=argparse.BooleanOptionalAction, default=False,
+                        help="whether depot is included in clustering")
+    parser.add_argument('--router_activation', type=str, default="none", choices=["none", "sigmoid"],
+                        help="activation for MoD router score")
     # =========================================================================
     # OPTIMIZER PARAMS
     # =========================================================================

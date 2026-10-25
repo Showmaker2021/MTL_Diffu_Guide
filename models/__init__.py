@@ -10,3 +10,5 @@ from .MOEModel_Light_Mixed import *
 from .SlotDiffModel import *
 from .SlotModel import *
 from .SlotDiffMOEModel import *
+from .shield_modules import *
+from .SHIELDModel import *
