@@ -247,6 +247,11 @@ if __name__ == "__main__":
         os.makedirs(args.log_path)
     
     if not args.no_cuda and torch.cuda.is_available():
+        gpu_count = torch.cuda.device_count()
+        if not (0 <= args.gpu_id < gpu_count):
+            print(f"ERROR: --gpu_id {args.gpu_id} out of range. This machine has {gpu_count} GPU(s): 0..{gpu_count-1}.")
+            print(f"Available: {[torch.cuda.get_device_name(i) for i in range(gpu_count)]}")
+            raise SystemExit(1)
         occumpy_mem(args) if args.occ_gpu != 0. else print(">> No occupation needed")
         args.device = torch.device('cuda', args.gpu_id)
         torch.cuda.set_device(args.gpu_id)
