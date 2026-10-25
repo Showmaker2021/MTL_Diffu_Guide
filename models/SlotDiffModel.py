@@ -571,6 +571,8 @@ class MTL_Decoder(nn.Module):
         
         # Gating mechanism
         self.slot_gate = nn.Linear(embedding_dim + 4, 1)
+        # Inference-only ablation: force gate weight beta = 0 (node-attention only)
+        self.gate_off = model_params.get('gate_off', False)
         
         # Multi-head combine (Pure Linear, no MOE)
         self.multi_head_combine = nn.Linear(head_num * qkv_dim, embedding_dim)
@@ -603,17 +605,18 @@ class MTL_Decoder(nn.Module):
         # Attention to nodes
         out_concat_nodes = multi_head_attention(q_last, self.k_nodes, self.v_nodes, rank3_ninf_mask=ninf_mask)
 
-        # Attention to slots (if available)
-        if self.slots is not None:
+        # Attention to slots (if available and gating enabled)
+        if self.slots is not None and not self.gate_off:
             out_concat_slots = multi_head_attention(q_last, self.k_slots, self.v_slots)
-            
+
             # Gating mechanism
             gate_logit = self.slot_gate(input_cat)
             gate_weight = torch.sigmoid(gate_logit)
-            
+
             # Weighted combination
             out_concat = gate_weight * out_concat_slots + (1 - gate_weight) * out_concat_nodes
         else:
+            # gate_off: force beta = 0 -> node-attention only
             out_concat = out_concat_nodes
 
         # Multi-head combine

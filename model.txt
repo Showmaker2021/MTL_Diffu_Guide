@@ -126,3 +126,7 @@ ParameterModule()
 --------------------------------------------
   TOTAL                   5,453,874  (5.454 M)  (0.0055 B)
 ============================================================
+
+
+
+python train.py --model_type SlotDiffModel --enable_slot_diffusion --diffusion_slot_mode noisy_slots --num_slot 32 -- gpu_id 0

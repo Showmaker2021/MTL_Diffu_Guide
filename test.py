@@ -51,6 +51,9 @@ def args2dict(args):
         
         # Legacy Reconstruction
         "enable_slot_reconstruction": args.enable_slot_reconstruction,
+
+        # Inference-only ablation: force decoder gate weight beta = 0
+        "gate_off": args.gate_off,
     }
     
     tester_params = {
@@ -166,8 +169,10 @@ if __name__ == "__main__":
     parser.add_argument('--aug_batch_size', type=int, default=100)
     parser.add_argument('--test_set_path', type=str, default=None, 
                         help="evaluate on default test dataset if None")
-    parser.add_argument('--test_set_opt_sol_path', type=str, default=None, 
+    parser.add_argument('--test_set_opt_sol_path', type=str, default=None,
                         help="evaluate on default test dataset if None")
+    parser.add_argument('--gate_off', action='store_true', default=False,
+                        help="Inference only: force slot gate weight beta=0 (node-attention only)")
 
     # Fine-tuning (optional)
     parser.add_argument('--fine_tune_epochs', type=int, default=0, 
