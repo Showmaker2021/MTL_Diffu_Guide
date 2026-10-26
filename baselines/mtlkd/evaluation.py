@@ -36,9 +36,16 @@ def main(argv=None, *, args=None):
         parser.error('--test_set_opt_sol_path requires --test_set_path')
     device, log_path = setup(args)
     checkpoint = torch.load(args.checkpoint, map_location=device, weights_only=False)
-    if checkpoint.get('model_type') != 'MTLKD':
-        raise ValueError('Use an MTLKD checkpoint from this repository for evaluation')
-    params = dict(checkpoint['model_params'], device=str(device), eval_type='argmax')
+    # The upstream MTL-KD checkpoint (student_model/result/epoch-N.pt) is a bare
+    # {epoch, model_state_dict, optimizer_state_dict, scheduler_state_dict, result_log}
+    # dict without a 'model_type' marker; the recipe defaults below rebuild it.
+    if 'model_params' in checkpoint:
+        params = dict(checkpoint['model_params'], device=str(device), eval_type='argmax')
+    else:
+        params = dict(embedding_dim=128, sqrt_embedding_dim=128 ** 0.5,
+                      encoder_layer_num=1, decoder_layer_num=6,
+                      qkv_dim=16, head_num=8, logit_clipping=10, ff_hidden_dim=512,
+                      eval_type='argmax', norm=None, device=str(device))
     model = MTLKD_model(**params).to(device)
     model.load_state_dict(checkpoint['model_state_dict'], strict=True)
     write_config(log_path / 'config.json', dict(vars(args), model_params=params,
