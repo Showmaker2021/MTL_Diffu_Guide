@@ -4,7 +4,6 @@ __pycache__/
 .pytest_cache/
 # Original upstream checkout/archive are kept locally; integrated code lives in baselines/mtlkd/.
 /MTLKD/
-/MTLKD.zip
 /URS/
 *.py[cod]
 *$py.class
