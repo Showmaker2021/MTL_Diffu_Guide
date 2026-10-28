@@ -198,6 +198,11 @@ class CVRPEnv:
     def load_problems(self, batch_size, problems=None, aug_factor=1):
         if problems is not None:
             depot_xy, node_xy, node_demand = problems
+            # Loaded datasets come from torch.Tensor(...) on CPU; bring them onto
+            # the env device so they can concat with depot_demand below.
+            depot_xy = depot_xy.to(self.device)
+            node_xy = node_xy.to(self.device)
+            node_demand = node_demand.to(self.device)
         else:
             depot_xy, node_xy, node_demand = self.get_random_problems(batch_size, self.problem_size, normalized=True)
         self.batch_size = depot_xy.size(0)
