@@ -647,6 +647,12 @@ class MTL_Decoder(nn.Module):
         self.slot_gate = nn.Linear(embedding_dim + 4, 1)
         self.slot_gate_cap = 0.3
 
+        # Slot pointer gate-off experiment
+        # gate_off == True forces the gate to 0 (beta==0): node score only.
+        # gate_multiplier scales the learned gate (control probe, e.g. 0.5).
+        self.gate_off = model_params.get('gate_off', False)
+        self.gate_multiplier = model_params.get('gate_multiplier', 1.0)
+
         # Multi-head combine for node pointer
         if model_params['num_experts'] > 1 and 'Dec' in model_params['expert_loc']:
             self.multi_head_combine = MoE(
@@ -730,7 +736,7 @@ class MTL_Decoder(nn.Module):
         score_nodes = torch.matmul(mh_atten_out_nodes, self.single_head_key)
         # (B, pomo, N)
 
-        if self.slots is not None:
+        if self.slots is not None and not self.gate_off:
             # ════════════════════════════════════════════
             # NHÁNH 2: Slot Pointer
             # ════════════════════════════════════════════
@@ -762,6 +768,11 @@ class MTL_Decoder(nn.Module):
             gate_weight = self.slot_gate_cap * torch.sigmoid(self.slot_gate(input_cat))
             # (B, pomo, 1)
 
+            # Control probe: scale beta (gate_weight) by gate_multiplier.
+            # gate_off is handled above (skips this branch entirely → beta == 0).
+            if self.gate_multiplier != 1.0:
+                gate_weight = gate_weight * self.gate_multiplier
+
             # Scale & clip cả 2 nhánh
             score_nodes_scaled = logit_clipping * torch.tanh(score_nodes / sqrt_embedding_dim)
             score_slots_scaled = logit_clipping * torch.tanh(score_slots / sqrt_embedding_dim)
@@ -777,7 +788,7 @@ class MTL_Decoder(nn.Module):
             score_masked = score_combined + ninf_mask
 
         else:
-            # Fallback: no slots available, use node pointer only
+            # --gate_off or no slots available: node pointer only (beta == 0)
             score_masked = logit_clipping * torch.tanh(score_nodes / sqrt_embedding_dim) + ninf_mask
 
         probs = F.softmax(score_masked, dim=2)

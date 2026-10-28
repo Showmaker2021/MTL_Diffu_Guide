@@ -67,8 +67,12 @@ def args2dict(args):
         "cluster_use_layernorm_state": args.cluster_use_layernorm_state,
         "cluster_include_depot": args.cluster_include_depot,
         "router_activation": args.router_activation,
+
+        # Slot pointer gate-off experiment
+        "gate_off": args.gate_off,
+        "gate_multiplier": args.gate_multiplier,
     }
-    
+
     optimizer_params = {
         "optimizer": {
             "lr": args.lr, 
@@ -162,6 +166,14 @@ if __name__ == "__main__":
                         help="number of slots for slot attention")
     parser.add_argument('--slot_iter_num', type=int, default=3,
                         help="number of iterations for slot attention")
+
+    # Slot pointer gate-off experiment
+    parser.add_argument('--gate_off', action='store_true', default=False,
+                        help="Force the slot-pointer gate to 0 (beta==0): only the node "
+                             "score remains. Skips the slot pointer's forward pass.")
+    parser.add_argument('--gate_multiplier', type=float, default=1.0,
+                        help="Scale the slot-pointer gate by this factor (control probe). "
+                             "Use 0.5 to halve beta while keeping the slot forward pass.")
     
     # =========================================================================
     # DUAL-TASK: SLOT DIFFUSION (NEW!)
