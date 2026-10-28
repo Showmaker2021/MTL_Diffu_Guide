@@ -1,5 +1,35 @@
 ## MTL Diffu Guide
 
+SlotDiff, MTL-KD, and URS run from this repository with the same dependencies,
+training generators, environments, and test datasets:
+
+```bash
+# Main method (5000 epochs by default)
+python train.py --model_type SlotDiffModel --enable_slot_diffusion --gpu_id 0
+
+# Integrated MTL-KD baseline (900 epochs, as in the original launcher)
+python train.py --model_type MTLKD --gpu_id 0
+
+# Integrated URS generalist baseline (500 epochs, as in the original launcher)
+python train.py --model_type URS --gpu_id 0
+
+# Evaluate the corresponding trained checkpoint on all 16 variants
+python test.py --model_type MTLKD --gpu_id 0 \
+  --checkpoint results/MTLKD/<run>/epoch-900.pt
+```
+
+The baseline code is vendored in [baselines/mtlkd](baselines/mtlkd/README.md).
+There is no submodule or separate upstream checkout to install. Its six frozen
+teacher checkpoints (about 87 MiB) download automatically on first training use,
+from a pinned commit with checksum verification, into ignored `pretrained/mtlkd/`.
+To prepare them separately: `python -m baselines.mtlkd.assets`.
+Evaluation uses this repository's `data/` and the shared reference costs;
+training generates fresh instances through the same root `envs/` as SlotDiff.
+The [URS integration](baselines/urs/README.md) uses the same root Trainer and
+Tester with the original URS model and AdamW optimizer. It needs no pretrained
+weights or upstream dataset. Its 500-epoch default and smaller adapted total
+instance budget are documented there; `--epochs` overrides remain available.
+
 This repository contains neural solvers for multiple Vehicle Routing Problem (VRP) variants, with a focus on a slot-enhanced Mixture-of-Experts policy model:
 
 - `SlotDiffMOEModel`: MoE policy + Slot Attention + optional Slot Diffusion auxiliary objective
@@ -97,8 +127,9 @@ pip install -r requirements.txt
 
 Note:
 
-- `requirements.txt` pins `torch==2.7.1+cu121` (CUDA build).
-- If your machine is CPU-only or uses another CUDA version, install a compatible Torch build first, then install remaining packages.
+- `requirements.txt` accepts PyTorch 2.7 or newer and includes the dependencies for both methods.
+- Install a PyTorch build suitable for your hardware first if you need a particular CUDA version.
+- Use `--gpu_id 0` on a single-GPU machine; `--no_cuda` supports small CPU checks.
 
 ### 3.2 Data
 
@@ -242,4 +273,3 @@ python train.py --model_type SlotDiffMOEModel --problem Train_ALL --enable_slot_
 # Test
 python test.py --model_type SlotDiffMOEModel --problem ALL --checkpoint results/<timestamp>/epoch-5000.pt --enable_slot_diffusion
 ```
-

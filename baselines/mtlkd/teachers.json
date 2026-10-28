@@ -1,0 +1,30 @@
+{
+  "repository": "https://github.com/CIAM-Group/MTLKD",
+  "revision": "a11a9b26a7b7775753a35af4e9f2138d477b9d32",
+  "files": {
+    "cvrp100.pt": {
+      "sha256": "1b0ef84182d73aee7f229f3cd96af491d7b6fd3c4674b947a572410202baf3f5",
+      "size_bytes": 15274185
+    },
+    "ovrp100.pt": {
+      "sha256": "fda5c2e829350ae67294bfeac3b822a0f28906ca8eecf7576dd5f2126ed95f1d",
+      "size_bytes": 15158179
+    },
+    "ovrptw100.pt": {
+      "sha256": "cb89c129710dd5ce853ce58e3dcbf5278492dba57af7498cba861cb5301b8c31",
+      "size_bytes": 15166115
+    },
+    "vrpb100.pt": {
+      "sha256": "2f18b19c98e1daae594f4c5f174520a71ca357a5387aa43d738e2c37584031c0",
+      "size_bytes": 15159971
+    },
+    "vrpl100.pt": {
+      "sha256": "11cef72cc252b9eacc1b8e10c98e72ee8338fc0f2562f418570b1b4ff0bfca9b",
+      "size_bytes": 15158435
+    },
+    "vrptw100.pt": {
+      "sha256": "00c9972fac4cc1acdce5220a452f68c3d18f5c5295c347717b511fc60d02f93d",
+      "size_bytes": 15278857
+    }
+  }
+}

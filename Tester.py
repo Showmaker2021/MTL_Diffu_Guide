@@ -27,7 +27,7 @@ class Tester:
 
         # load dataset
         if tester_params['test_set_path'] is None or tester_params['test_set_path'].endswith(".pkl"):
-            self.data_dir = "./data"
+            self.data_dir = str(getattr(args, 'data_dir', './data'))
         else:
             # for solving benchmark instances
             self.path_list = [os.path.join(tester_params['test_set_path'], f) for f in sorted(os.listdir(tester_params['test_set_path']))] \
