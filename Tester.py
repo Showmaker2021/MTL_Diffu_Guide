@@ -127,7 +127,8 @@ class Tester:
                     ])
                 
                 print(f"Results saved to {result_file}")
-                self.slot_eval.run(model, env)
+                if hasattr(model, 'encoder') and hasattr(model.encoder, 'slot_attention_module'):
+                    self.slot_eval.run(model, env)
                 
         return scores, aug_scores
 

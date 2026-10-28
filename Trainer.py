@@ -163,7 +163,7 @@ class Trainer:
         # ========================================
         # 2. SLOT DIFFUSION LOSS - Nhánh 2 (MỚI!)
         # ========================================
-        if self.lambda_diffusion > 0.0:
+        if self.lambda_diffusion > 0.0 and hasattr(self.model, "compute_slot_diffusion_loss"):
             try:
                 diffusion_loss = self.model.compute_slot_diffusion_loss()
                 total_loss = total_loss + self.lambda_diffusion * diffusion_loss
@@ -175,7 +175,7 @@ class Trainer:
         # ========================================
         # 3. SLOT RECONSTRUCTION LOSS (Legacy, optional)
         # ========================================
-        if self.lambda_recon > 0.0:
+        if self.lambda_recon > 0.0 and hasattr(self.model, "compute_slot_reconstruction_loss"):
             try:
                 recon_loss = self.model.compute_slot_reconstruction_loss(reset_state)
                 total_loss = total_loss + self.lambda_recon * recon_loss
@@ -187,7 +187,7 @@ class Trainer:
         # ========================================
         # 4. SLOT CONTRASTIVE LOSS
         # ========================================
-        if self.lambda_contrastive > 0.0:
+        if self.lambda_contrastive > 0.0 and hasattr(self.model, "compute_slot_contrastive_loss"):
             try:
                 contrastive_loss = self.model.compute_slot_contrastive_loss()
                 total_loss = total_loss + self.lambda_contrastive * contrastive_loss

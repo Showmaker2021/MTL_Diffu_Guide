@@ -121,7 +121,7 @@ def get_env(problem):
 
 
 def get_model(model_type):
-    from models import SINGLEModel, MOEModel, MOEModel_Light, MTLModel, MTLModel_Mixed, MOEModel_Mixed, MOEModel_Light_Mixed, SlotDiffModel, SlotModel, SlotDiffMOEModel
+    from models import SINGLEModel, MOEModel, MOEModel_Light, MTLModel, MTLModel_Mixed, MOEModel_Mixed, MOEModel_Light_Mixed, SlotDiffModel, SlotModel, SlotDiffMOEModel, SHIELDModel
     if model_type == "MTL":
         return MTLModel
     elif model_type == "MOE":
@@ -142,9 +142,10 @@ def get_model(model_type):
         return SlotModel
     elif model_type == "SlotDiffMOEModel":
         return SlotDiffMOEModel
+    elif model_type == "SHIELD":
+        return SHIELDModel
     else:
         return NotImplementedError
-
 
 def get_opt_sol_path(dir, problem, size):
     all_opt_sol = {
